@@ -239,7 +239,6 @@ code {
   font-size: 0.85rem;
 }
 
-.configuration-meta,
 .account-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
@@ -247,14 +246,12 @@ code {
   margin: 16px 0;
 }
 
-.configuration-meta div,
 .account-grid div {
   padding: 12px;
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.04);
 }
 
-.configuration-meta dt,
 .account-grid dt {
   font-size: 0.78rem;
   text-transform: uppercase;
@@ -262,9 +259,38 @@ code {
   color: rgba(248, 242, 233, 0.58);
 }
 
-.configuration-meta dd,
 .account-grid dd {
   margin: 6px 0 0;
+}
+
+.configuration-summary {
+  margin: 12px 0 0;
+  color: rgba(248, 242, 233, 0.72);
+}
+
+.configuration-source-list {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.configuration-source-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: baseline;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(248, 242, 233, 0.82);
+}
+
+.configuration-source-share {
+  color: rgba(247, 192, 96, 0.88);
+  font-size: 0.9rem;
+  white-space: nowrap;
 }
 
 .status-text {

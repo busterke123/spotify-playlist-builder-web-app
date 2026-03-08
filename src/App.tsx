@@ -462,29 +462,28 @@ export function App(): ReactElement {
                 {activeConfigurations.map((configuration) => {
                   const rebuildState = statesByConfigurationID[configuration.id] ?? { type: "idle" as const };
                   const latestHistoryEntry = configurationHistory(configuration.id)[0];
+                  const statusMessage = renderRebuildState(rebuildState) ?? (latestHistoryEntry ? historySummary(latestHistoryEntry) : null);
                   return (
                     <article className="configuration-card" key={configuration.id}>
                       <div className="configuration-card__top">
                         <div>
                           <h3>{configuration.name}</h3>
-                          <p>{configuration.targetPlaylistName}</p>
+                          <p>Target: {configuration.targetPlaylistName}</p>
                         </div>
                         <span className="pill">{selectionModeLabels[configuration.selectionMode]}</span>
                       </div>
-                      <dl className="configuration-meta">
-                        <div>
-                          <dt>Sources</dt>
-                          <dd>{configuration.sourcePlaylists.length}</dd>
-                        </div>
-                        <div>
-                          <dt>Tracks</dt>
-                          <dd>{configuration.targetTrackCount}</dd>
-                        </div>
-                      </dl>
-                      <p className="status-text">
-                        {renderRebuildState(rebuildState) ??
-                          (latestHistoryEntry ? historySummary(latestHistoryEntry) : "Ready to rebuild.")}
-                      </p>
+                      <p className="configuration-summary">{configuration.targetTrackCount} tracks</p>
+                      <ul className="configuration-source-list">
+                        {configuration.sourcePlaylists.map((sourcePlaylist) => (
+                          <li className="configuration-source-item" key={sourcePlaylist.id}>
+                            <span>{sourcePlaylist.playlistName}</span>
+                            {configuration.selectionMode === "percent" ? (
+                              <span className="configuration-source-share">{sourcePlaylist.percentage ?? 0}%</span>
+                            ) : null}
+                          </li>
+                        ))}
+                      </ul>
+                      {statusMessage ? <p className="status-text">{statusMessage}</p> : null}
                       <div className="card-actions">
                         <button
                           className="button button--primary"
