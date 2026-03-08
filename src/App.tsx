@@ -453,7 +453,7 @@ export function App(): ReactElement {
         <main className="workspace">
           <section className="panel">
             <div className="panel__header">
-              <h2>Active</h2>
+              <h2>Configurations</h2>
               <button className="button button--ghost" onClick={() => setEditorState(initialEditorState())}>
                 New
               </button>
