@@ -84,10 +84,14 @@ code {
 
 .icon-button {
   flex: 0 0 auto;
+  min-width: 0;
+  min-height: 0;
   padding: 0;
+  border-width: 0;
   line-height: 0;
-  display: grid;
-  place-items: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border-radius: 999px;
 }
 
