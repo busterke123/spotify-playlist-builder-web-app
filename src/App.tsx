@@ -613,60 +613,67 @@ export function App(): ReactElement {
 
       {showsAccountPanel && session ? (
         <div className="modal-backdrop" onClick={() => setShowsAccountPanel(false)}>
-          <section className="modal" onClick={(event) => event.stopPropagation()}>
+          <section className="modal account-modal" onClick={(event) => event.stopPropagation()}>
             <div className="panel__header">
               <h2>Spotify account</h2>
               <button className="button button--ghost" onClick={() => setShowsAccountPanel(false)}>
                 Close
               </button>
             </div>
-            <dl className="account-grid">
-              <div>
-                <dt>Connected</dt>
-                <dd>Yes</dd>
-              </div>
-              <div>
-                <dt>Expires</dt>
-                <dd>{formatDateTime(session.expiryDate)}</dd>
-              </div>
-              <div>
-                <dt>Scopes</dt>
-                <dd>{session.scopeString || "playlist-read/private + modify"}</dd>
-              </div>
-            </dl>
-            <section className="subpanel backup-panel">
-              <div className="panel__header">
-                <h3>Backup</h3>
-              </div>
-              <p className="inline-note">
-                Save a JSON backup to Files and import it later if Safari clears this browser&apos;s data.
-              </p>
-              <div className="card-actions">
-                <button className="button button--secondary" onClick={handleExportBackup}>
-                  Export backup
-                </button>
-                <button
-                  className="button button--ghost"
-                  onClick={() => backupImportInputRef.current?.click()}
-                >
-                  Import backup
-                </button>
-              </div>
-              <input
-                ref={backupImportInputRef}
-                type="file"
-                accept="application/json,.json"
-                className="visually-hidden"
-                onChange={(event) => void handleImportBackup(event)}
-              />
-            </section>
-            <div className="card-actions">
-              <button className="button button--secondary" onClick={() => void handleConnectSpotify()}>
-                Reconnect Spotify
-              </button>
-              <button className="button button--ghost" onClick={handleSignOut}>
-                Sign out
-              </button>
+            <div className="account-modal__grid">
+              <section className="subpanel">
+                <div className="panel__header">
+                  <h3>Spotify</h3>
+                </div>
+                <dl className="account-grid">
+                  <div>
+                    <dt>Connected</dt>
+                    <dd>Yes</dd>
+                  </div>
+                  <div>
+                    <dt>Expires</dt>
+                    <dd>{formatDateTime(session.expiryDate)}</dd>
+                  </div>
+                  <div>
+                    <dt>Scopes</dt>
+                    <dd>{session.scopeString || "playlist-read/private + modify"}</dd>
+                  </div>
+                </dl>
+                <div className="card-actions">
+                  <button className="button button--secondary" onClick={() => void handleConnectSpotify()}>
+                    Reconnect Spotify
+                  </button>
+                  <button className="button button--ghost" onClick={handleSignOut}>
+                    Sign out
+                  </button>
+                </div>
+              </section>
+              <section className="subpanel backup-panel">
+                <div className="panel__header">
+                  <h3>Backup</h3>
+                </div>
+                <p className="inline-note">
+                  Save a JSON backup to Files and import it later if Safari clears this browser&apos;s data.
+                </p>
+                <div className="card-actions">
+                  <button className="button button--secondary" onClick={handleExportBackup}>
+                    Export backup
+                  </button>
+                  <button
+                    className="button button--ghost"
+                    onClick={() => backupImportInputRef.current?.click()}
+                  >
+                    Import backup
+                  </button>
+                </div>
+                <input
+                  ref={backupImportInputRef}
+                  type="file"
+                  accept="application/json,.json"
+                  className="visually-hidden"
+                  onChange={(event) => void handleImportBackup(event)}
+                />
+              </section>
             </div>
           </section>
         </div>
