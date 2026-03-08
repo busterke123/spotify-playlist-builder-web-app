@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import type { ReactElement } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { ChangeEvent, ReactElement } from "react";
 import {
   createEmptyConfiguration,
   selectionModeLabels,
@@ -18,7 +18,9 @@ import {
   storeSession
 } from "./lib/spotifyAuth";
 import {
+  createSnapshotBackup,
   loadSnapshot,
+  parseSnapshotBackup,
   persistSnapshot,
   recordRebuildHistory,
   saveConfiguration,
@@ -97,6 +99,7 @@ export function App(): ReactElement {
   const [statesByConfigurationID, setStatesByConfigurationID] = useState<Record<string, ConfigurationRebuildState>>({});
   const [activeConfigurationID, setActiveConfigurationID] = useState<string | null>(null);
   const [showsAccountPanel, setShowsAccountPanel] = useState(false);
+  const backupImportInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     persistSnapshot(snapshot);
@@ -158,6 +161,55 @@ export function App(): ReactElement {
     setSession(null);
     setPlaylistCache([]);
     setShowsAccountPanel(false);
+  };
+
+  const handleExportBackup = () => {
+    try {
+      const backup = createSnapshotBackup(snapshot);
+      const blob = new Blob([backup], { type: "application/json" });
+      const objectURL = window.URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      const datePart = new Date().toISOString().slice(0, 10);
+
+      anchor.href = objectURL;
+      anchor.download = `spotify-playlist-builder-backup-${datePart}.json`;
+      anchor.click();
+      window.URL.revokeObjectURL(objectURL);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Could not export backup.");
+    }
+  };
+
+  const handleImportBackup = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+
+    if (!file) {
+      return;
+    }
+
+    try {
+      const importedSnapshot = parseSnapshotBackup(await file.text());
+      const nextConfigurationCount = importedSnapshot.configurations.length;
+      const shouldReplace = window.confirm(
+        `Replace this device's saved data with ${nextConfigurationCount} imported configuration${nextConfigurationCount === 1 ? "" : "s"}?`
+      );
+
+      if (!shouldReplace) {
+        return;
+      }
+
+      setSnapshot(importedSnapshot);
+      setEditorState(null);
+      setPreviewState(null);
+      setHistoryConfigurationID(null);
+      setStatesByConfigurationID({});
+      setActiveConfigurationID(null);
+      setShowsAccountPanel(false);
+      setErrorMessage(null);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Could not import backup.");
+    }
   };
 
   const saveDraft = () => {
@@ -519,20 +571,6 @@ export function App(): ReactElement {
                             <path d="M13 3a9 9 0 1 0 8.95 10h-2.02A7 7 0 1 1 13 5c1.93 0 3.68.78 4.95 2.05L15 10h7V3l-2.63 2.63A8.96 8.96 0 0 0 13 3Zm-1 5v5.41l3.29 3.29 1.42-1.41L14 12.59V8h-2Z" />
                           </svg>
                         </button>
-                        <button
-                          className="button button--ghost icon-button"
-                          onClick={() =>
-                            setSnapshot((currentSnapshot) =>
-                              setArchiveState(currentSnapshot, configuration.id, true)
-                            )
-                          }
-                          aria-label="Archive configuration"
-                          title="Archive configuration"
-                        >
-                          <svg viewBox="0 0 24 24" aria-hidden="true">
-                            <path d="M20.54 5.23 19.15 3.55A2 2 0 0 0 17.61 3H6.39a2 2 0 0 0-1.54.55L3.46 5.23A2 2 0 0 0 3 6.5V19a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6.5a2 2 0 0 0-.46-1.27ZM6.39 5h11.22l.81 1H5.58l.81-1ZM19 19H5V8h14v11Zm-8-9h2v3h3l-4 4-4-4h3v-3Z" />
-                          </svg>
-                        </button>
                       </div>
                     </article>
                   );
@@ -596,6 +634,32 @@ export function App(): ReactElement {
                 <dd>{session.scopeString || "playlist-read/private + modify"}</dd>
               </div>
             </dl>
+            <section className="subpanel backup-panel">
+              <div className="panel__header">
+                <h3>Backup</h3>
+              </div>
+              <p className="inline-note">
+                Save a JSON backup to Files and import it later if Safari clears this browser&apos;s data.
+              </p>
+              <div className="card-actions">
+                <button className="button button--secondary" onClick={handleExportBackup}>
+                  Export backup
+                </button>
+                <button
+                  className="button button--ghost"
+                  onClick={() => backupImportInputRef.current?.click()}
+                >
+                  Import backup
+                </button>
+              </div>
+              <input
+                ref={backupImportInputRef}
+                type="file"
+                accept="application/json,.json"
+                className="visually-hidden"
+                onChange={(event) => void handleImportBackup(event)}
+              />
+            </section>
             <div className="card-actions">
               <button className="button button--secondary" onClick={() => void handleConnectSpotify()}>
                 Reconnect Spotify
