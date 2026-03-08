@@ -82,10 +82,8 @@ code {
   white-space: nowrap;
 }
 
-.hero__icon-button {
+.icon-button {
   flex: 0 0 auto;
-  width: 48px;
-  height: 48px;
   padding: 0;
   line-height: 0;
   display: grid;
@@ -93,11 +91,29 @@ code {
   border-radius: 999px;
 }
 
-.hero__icon-button svg {
+.icon-button svg {
   display: block;
+  fill: currentColor;
+}
+
+.hero__icon-button {
+  width: 48px;
+  height: 48px;
+}
+
+.hero__icon-button svg {
   width: 22px;
   height: 22px;
-  fill: currentColor;
+}
+
+.card-actions .icon-button {
+  width: 42px;
+  height: 42px;
+}
+
+.card-actions .icon-button svg {
+  width: 18px;
+  height: 18px;
 }
 
 .hero__text {

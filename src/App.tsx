@@ -404,7 +404,7 @@ export function App(): ReactElement {
             <h1>Spotify Playlist Builder</h1>
             {session ? (
               <button
-                className="button button--ghost hero__icon-button"
+                className="button button--ghost icon-button hero__icon-button"
                 onClick={() => setShowsAccountPanel(true)}
                 aria-label="Open Spotify account"
                 title="Spotify account"
@@ -453,7 +453,7 @@ export function App(): ReactElement {
         <main className="workspace">
           <section className="panel">
             <div className="panel__header">
-              <h2>Active configurations</h2>
+              <h2>Active</h2>
               <button className="button button--ghost" onClick={() => setEditorState(initialEditorState())}>
                 New
               </button>
@@ -500,26 +500,38 @@ export function App(): ReactElement {
                           Rebuild
                         </button>
                         <button
-                          className="button button--secondary"
+                          className="button button--secondary icon-button"
                           onClick={() => setEditorState(initialEditorState(configuration))}
+                          aria-label="Edit configuration"
+                          title="Edit configuration"
                         >
-                          Edit
+                          <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M3 17.25V21h3.75L17.8 9.94l-3.75-3.75L3 17.25Zm2.92 2.33H5v-.92l9.06-9.06.92.92L5.92 19.58ZM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.13 1.13 3.75 3.75 1.13-1.13Z" />
+                          </svg>
                         </button>
                         <button
-                          className="button button--ghost"
+                          className="button button--ghost icon-button"
                           onClick={() => setHistoryConfigurationID(configuration.id)}
+                          aria-label="Show rebuild history"
+                          title="Show rebuild history"
                         >
-                          History
+                          <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M13 3a9 9 0 1 0 8.95 10h-2.02A7 7 0 1 1 13 5c1.93 0 3.68.78 4.95 2.05L15 10h7V3l-2.63 2.63A8.96 8.96 0 0 0 13 3Zm-1 5v5.41l3.29 3.29 1.42-1.41L14 12.59V8h-2Z" />
+                          </svg>
                         </button>
                         <button
-                          className="button button--ghost"
+                          className="button button--ghost icon-button"
                           onClick={() =>
                             setSnapshot((currentSnapshot) =>
                               setArchiveState(currentSnapshot, configuration.id, true)
                             )
                           }
+                          aria-label="Archive configuration"
+                          title="Archive configuration"
                         >
-                          Archive
+                          <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M20.54 5.23 19.15 3.55A2 2 0 0 0 17.61 3H6.39a2 2 0 0 0-1.54.55L3.46 5.23A2 2 0 0 0 3 6.5V19a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6.5a2 2 0 0 0-.46-1.27ZM6.39 5h11.22l.81 1H5.58l.81-1ZM19 19H5V8h14v11Zm-8-9h2v3h3l-4 4-4-4h3v-3Z" />
+                          </svg>
                         </button>
                       </div>
                     </article>
