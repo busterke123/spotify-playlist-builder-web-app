@@ -324,13 +324,14 @@ code {
 
 .configuration-summary span + span {
   position: relative;
+  padding-left: 8px;
 }
 
 .configuration-summary span + span::before {
   content: "";
   position: absolute;
   top: 50%;
-  left: -6px;
+  left: 0;
   width: 4px;
   height: 4px;
   border-radius: 999px;
