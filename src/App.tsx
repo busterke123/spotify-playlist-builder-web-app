@@ -1,0 +1,968 @@
+import { useEffect, useMemo, useState } from "react";
+import type { ReactElement } from "react";
+import {
+  createEmptyConfiguration,
+  selectionModeLabels,
+  validateConfiguration
+} from "./lib/configuration";
+import { createHistoryEntry, historySummary } from "./lib/history";
+import { applyPreview, preparePreview } from "./lib/rebuildService";
+import { createPlaylist, fetchCurrentUserPlaylists } from "./lib/spotifyApi";
+import {
+  beginSpotifyLogin,
+  clearStoredSession,
+  completeSpotifyLoginIfPresent,
+  getRedirectURI,
+  getSpotifyClientID,
+  loadStoredSession,
+  storeSession
+} from "./lib/spotifyAuth";
+import {
+  loadSnapshot,
+  persistSnapshot,
+  recordRebuildHistory,
+  saveConfiguration,
+  setArchiveState
+} from "./lib/storage";
+import type {
+  ConfigurationRebuildState,
+  ConfigurationStoreSnapshot,
+  PlaylistConfigurationDraft,
+  PlaylistRebuildPreview,
+  PlaylistSummary,
+  RebuildHistoryEntry,
+  SpotifySession
+} from "./lib/types";
+import { clamp, formatDateTime } from "./lib/utils";
+
+type PickerMode = "target" | "sources";
+
+interface EditorState {
+  draft: PlaylistConfigurationDraft;
+  validationIssues: string[];
+  saveError: string | null;
+  pickerMode: PickerMode | null;
+  isCreatingTargetPlaylist: boolean;
+}
+
+function initialEditorState(configuration?: PlaylistConfigurationDraft): EditorState {
+  return {
+    draft: configuration ? structuredClone(configuration) : createEmptyConfiguration(),
+    validationIssues: [],
+    saveError: null,
+    pickerMode: null,
+    isCreatingTargetPlaylist: false
+  };
+}
+
+function byArchiveState(
+  configurations: PlaylistConfigurationDraft[],
+  isArchived: boolean
+): PlaylistConfigurationDraft[] {
+  return configurations.filter((configuration) => configuration.isArchived === isArchived);
+}
+
+function renderRebuildState(state: ConfigurationRebuildState): string | null {
+  switch (state.type) {
+    case "idle":
+      return null;
+    case "preparing-preview":
+    case "rebuilding":
+      return state.step;
+    case "succeeded":
+    case "failed":
+      return state.message;
+  }
+}
+
+function allocationWasRebalanced(allocation: PlaylistRebuildPreview["sourceAllocations"][number]): boolean {
+  return allocation.requestedTrackCount !== null && allocation.requestedTrackCount !== allocation.selectedTrackCount;
+}
+
+export function App(): ReactElement {
+  const [snapshot, setSnapshot] = useState<ConfigurationStoreSnapshot>(() => loadSnapshot());
+  const [session, setSession] = useState<SpotifySession | null>(() => loadStoredSession());
+  const [isResolvingSession, setIsResolvingSession] = useState(true);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isWorking, setIsWorking] = useState(false);
+  const [playlistCache, setPlaylistCache] = useState<PlaylistSummary[]>([]);
+  const [editorState, setEditorState] = useState<EditorState | null>(null);
+  const [previewState, setPreviewState] = useState<{
+    configuration: PlaylistConfigurationDraft;
+    preview: PlaylistRebuildPreview;
+    isApplying: boolean;
+    progressMessage: string | null;
+  } | null>(null);
+  const [historyConfigurationID, setHistoryConfigurationID] = useState<string | null>(null);
+  const [statesByConfigurationID, setStatesByConfigurationID] = useState<Record<string, ConfigurationRebuildState>>({});
+  const [activeConfigurationID, setActiveConfigurationID] = useState<string | null>(null);
+  const [showsAccountPanel, setShowsAccountPanel] = useState(false);
+
+  useEffect(() => {
+    persistSnapshot(snapshot);
+  }, [snapshot]);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const nextSession = await completeSpotifyLoginIfPresent();
+        if (nextSession) {
+          setSession(nextSession);
+        }
+      } catch (error) {
+        setErrorMessage(error instanceof Error ? error.message : "Spotify sign-in failed.");
+      } finally {
+        setIsResolvingSession(false);
+      }
+    })();
+  }, []);
+
+  const activeConfigurations = useMemo(
+    () => byArchiveState(snapshot.configurations, false),
+    [snapshot.configurations]
+  );
+  const archivedConfigurations = useMemo(
+    () => byArchiveState(snapshot.configurations, true),
+    [snapshot.configurations]
+  );
+
+  const configurationHistory = (configurationID: string): RebuildHistoryEntry[] =>
+    snapshot.rebuildHistoryByConfigurationID[configurationID] ?? [];
+
+  const loadPlaylists = async (): Promise<PlaylistSummary[]> => {
+    if (!session) {
+      throw new Error("Connect Spotify first.");
+    }
+
+    const response = await fetchCurrentUserPlaylists(session);
+    setSession(response.session);
+    storeSession(response.session);
+    setPlaylistCache(response.playlists);
+    return response.playlists;
+  };
+
+  const handleConnectSpotify = async () => {
+    setErrorMessage(null);
+    setIsWorking(true);
+    try {
+      getSpotifyClientID();
+      await beginSpotifyLogin();
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Could not start Spotify login.");
+      setIsWorking(false);
+    }
+  };
+
+  const handleSignOut = () => {
+    clearStoredSession();
+    setSession(null);
+    setPlaylistCache([]);
+    setShowsAccountPanel(false);
+  };
+
+  const saveDraft = () => {
+    if (!editorState) {
+      return;
+    }
+
+    const issues = validateConfiguration(editorState.draft);
+    if (issues.length > 0) {
+      setEditorState({
+        ...editorState,
+        validationIssues: issues
+      });
+      return;
+    }
+
+    setSnapshot((currentSnapshot) => saveConfiguration(currentSnapshot, editorState.draft));
+    setEditorState(null);
+  };
+
+  const updateDraft = (updater: (draft: PlaylistConfigurationDraft) => PlaylistConfigurationDraft) => {
+    setEditorState((currentState) => {
+      if (!currentState) {
+        return currentState;
+      }
+
+      return {
+        ...currentState,
+        draft: updater(currentState.draft),
+        validationIssues: [],
+        saveError: null
+      };
+    });
+  };
+
+  const openPicker = async (pickerMode: PickerMode) => {
+    if (!editorState) {
+      return;
+    }
+
+    try {
+      setIsWorking(true);
+      await loadPlaylists();
+      setEditorState({
+        ...editorState,
+        pickerMode
+      });
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Could not load playlists.");
+    } finally {
+      setIsWorking(false);
+    }
+  };
+
+  const handleCreateTargetPlaylist = async () => {
+    if (!editorState || !session) {
+      return;
+    }
+
+    try {
+      setEditorState({
+        ...editorState,
+        isCreatingTargetPlaylist: true,
+        saveError: null
+      });
+      const response = await createPlaylist(session, editorState.draft.targetPlaylistName);
+      setSession(response.session);
+      storeSession(response.session);
+      setPlaylistCache((currentPlaylists) => {
+        const nextPlaylists = [response.playlist, ...currentPlaylists.filter((playlist) => playlist.id !== response.playlist.id)];
+        return nextPlaylists.sort((lhs, rhs) => lhs.name.localeCompare(rhs.name));
+      });
+      setEditorState((currentState) => {
+        if (!currentState) {
+          return currentState;
+        }
+
+        return {
+          ...currentState,
+          isCreatingTargetPlaylist: false,
+          draft: {
+            ...currentState.draft,
+            targetPlaylistID: response.playlist.id,
+            targetPlaylistName: response.playlist.name
+          }
+        };
+      });
+    } catch (error) {
+      setEditorState((currentState) =>
+        currentState
+          ? {
+              ...currentState,
+              isCreatingTargetPlaylist: false,
+              saveError: error instanceof Error ? error.message : "Could not create playlist."
+            }
+          : currentState
+      );
+    }
+  };
+
+  const handlePreparePreview = async (configuration: PlaylistConfigurationDraft) => {
+    if (activeConfigurationID) {
+      setErrorMessage("A rebuild is already running. Wait for it to finish before starting another one.");
+      return;
+    }
+
+    if (!session) {
+      setErrorMessage("Connect Spotify first.");
+      return;
+    }
+
+    setActiveConfigurationID(configuration.id);
+    setStatesByConfigurationID((currentState) => ({
+      ...currentState,
+      [configuration.id]: { type: "preparing-preview", step: "Preparing rebuild preview…" }
+    }));
+
+    try {
+      const result = await preparePreview({
+        configuration,
+        session,
+        onProgress: (step) => {
+          setStatesByConfigurationID((currentState) => ({
+            ...currentState,
+            [configuration.id]: { type: "preparing-preview", step }
+          }));
+        }
+      });
+      setSession(result.session);
+      storeSession(result.session);
+      setStatesByConfigurationID((currentState) => ({
+        ...currentState,
+        [configuration.id]: { type: "idle" }
+      }));
+      setPreviewState({
+        configuration,
+        preview: result.preview,
+        isApplying: false,
+        progressMessage: null
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Could not prepare rebuild preview.";
+      setStatesByConfigurationID((currentState) => ({
+        ...currentState,
+        [configuration.id]: { type: "failed", message }
+      }));
+      setErrorMessage(message);
+    } finally {
+      setActiveConfigurationID(null);
+    }
+  };
+
+  const handleApplyPreview = async () => {
+    if (!previewState || !session) {
+      return;
+    }
+
+    if (activeConfigurationID) {
+      setErrorMessage("A rebuild is already running. Wait for it to finish before starting another one.");
+      return;
+    }
+
+    const configurationID = previewState.configuration.id;
+    setActiveConfigurationID(configurationID);
+    setPreviewState({
+      ...previewState,
+      isApplying: true,
+      progressMessage: "Preparing rebuild…"
+    });
+    setStatesByConfigurationID((currentState) => ({
+      ...currentState,
+      [configurationID]: { type: "rebuilding", step: "Preparing rebuild…" }
+    }));
+
+    try {
+      const result = await applyPreview({
+        preview: previewState.preview,
+        session,
+        onProgress: (step) => {
+          setPreviewState((currentState) =>
+            currentState
+              ? {
+                  ...currentState,
+                  progressMessage: step
+                }
+              : currentState
+          );
+          setStatesByConfigurationID((currentState) => ({
+            ...currentState,
+            [configurationID]: { type: "rebuilding", step }
+          }));
+        }
+      });
+      setSession(result.session);
+      storeSession(result.session);
+      const historyEntry = createHistoryEntry({
+        configurationID,
+        preview: previewState.preview,
+        finishedAt: result.rebuiltAt
+      });
+      setSnapshot((currentSnapshot) => recordRebuildHistory(currentSnapshot, historyEntry));
+      setStatesByConfigurationID((currentState) => ({
+        ...currentState,
+        [configurationID]: {
+          type: "succeeded",
+          message: historySummary(historyEntry),
+          rebuiltAt: result.rebuiltAt
+        }
+      }));
+      setPreviewState(null);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Could not rebuild playlist.";
+      const historyEntry = createHistoryEntry({
+        configurationID,
+        preview: previewState.preview,
+        finishedAt: new Date().toISOString(),
+        errorMessage: message
+      });
+      setSnapshot((currentSnapshot) => recordRebuildHistory(currentSnapshot, historyEntry));
+      setStatesByConfigurationID((currentState) => ({
+        ...currentState,
+        [configurationID]: { type: "failed", message }
+      }));
+      setPreviewState((currentState) =>
+        currentState
+          ? {
+              ...currentState,
+              isApplying: false,
+              progressMessage: null
+            }
+          : currentState
+      );
+      setErrorMessage(message);
+    } finally {
+      setActiveConfigurationID(null);
+    }
+  };
+
+  return (
+    <div className="app-shell">
+      <header className="hero">
+        <div className="hero__copy">
+          <p className="eyebrow">GitHub Pages Edition</p>
+          <h1>Build reusable Spotify playlist recipes in the browser.</h1>
+          <p className="hero__text">
+            Your configurations stay in this browser. Spotify auth uses PKCE, rebuilds show a preview
+            before writing, and the target playlist can be created directly from the app.
+          </p>
+          <div className="hero__actions">
+            {session ? (
+              <>
+                <button className="button button--primary" onClick={() => setEditorState(initialEditorState())}>
+                  New configuration
+                </button>
+                <button className="button button--secondary" onClick={() => setShowsAccountPanel(true)}>
+                  Spotify account
+                </button>
+              </>
+            ) : (
+              <button className="button button--primary" onClick={() => void handleConnectSpotify()} disabled={isWorking}>
+                Connect Spotify
+              </button>
+            )}
+          </div>
+        </div>
+        <div className="hero__card">
+          <div className="stat">
+            <span className="stat__label">Redirect URI</span>
+            <span className="stat__value">{getRedirectURI()}</span>
+          </div>
+          <div className="stat">
+            <span className="stat__label">Stored configurations</span>
+            <span className="stat__value">{snapshot.configurations.length}</span>
+          </div>
+          <div className="stat">
+            <span className="stat__label">Where they live</span>
+            <span className="stat__value">This browser only</span>
+          </div>
+        </div>
+      </header>
+
+      {errorMessage ? (
+        <div className="notice notice--error">
+          <span>{errorMessage}</span>
+          <button className="notice__dismiss" onClick={() => setErrorMessage(null)}>
+            Dismiss
+          </button>
+        </div>
+      ) : null}
+
+      {isResolvingSession ? (
+        <section className="empty-state">
+          <h2>Restoring Spotify session…</h2>
+        </section>
+      ) : !session ? (
+        <section className="empty-state">
+          <h2>Spotify login required</h2>
+          <p>
+            Set <code>VITE_SPOTIFY_CLIENT_ID</code>, register <code>{getRedirectURI()}</code> in the
+            Spotify app dashboard, then connect.
+          </p>
+        </section>
+      ) : (
+        <main className="workspace">
+          <section className="panel">
+            <div className="panel__header">
+              <h2>Active configurations</h2>
+              <button className="button button--ghost" onClick={() => setEditorState(initialEditorState())}>
+                New
+              </button>
+            </div>
+            {activeConfigurations.length === 0 ? (
+              <div className="panel__empty">
+                Create a saved setup with one target playlist and one or more source playlists.
+              </div>
+            ) : (
+              <div className="configuration-grid">
+                {activeConfigurations.map((configuration) => {
+                  const rebuildState = statesByConfigurationID[configuration.id] ?? { type: "idle" as const };
+                  const latestHistoryEntry = configurationHistory(configuration.id)[0];
+                  return (
+                    <article className="configuration-card" key={configuration.id}>
+                      <div className="configuration-card__top">
+                        <div>
+                          <h3>{configuration.name}</h3>
+                          <p>{configuration.targetPlaylistName}</p>
+                        </div>
+                        <span className="pill">{selectionModeLabels[configuration.selectionMode]}</span>
+                      </div>
+                      <dl className="configuration-meta">
+                        <div>
+                          <dt>Sources</dt>
+                          <dd>{configuration.sourcePlaylists.length}</dd>
+                        </div>
+                        <div>
+                          <dt>Tracks</dt>
+                          <dd>{configuration.targetTrackCount}</dd>
+                        </div>
+                      </dl>
+                      <p className="status-text">
+                        {renderRebuildState(rebuildState) ??
+                          (latestHistoryEntry ? historySummary(latestHistoryEntry) : "Ready to rebuild.")}
+                      </p>
+                      <div className="card-actions">
+                        <button
+                          className="button button--primary"
+                          onClick={() => void handlePreparePreview(configuration)}
+                          disabled={activeConfigurationID !== null && activeConfigurationID !== configuration.id}
+                        >
+                          Preview rebuild
+                        </button>
+                        <button
+                          className="button button--secondary"
+                          onClick={() => setEditorState(initialEditorState(configuration))}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          className="button button--ghost"
+                          onClick={() => setHistoryConfigurationID(configuration.id)}
+                        >
+                          History
+                        </button>
+                        <button
+                          className="button button--ghost"
+                          onClick={() =>
+                            setSnapshot((currentSnapshot) =>
+                              setArchiveState(currentSnapshot, configuration.id, true)
+                            )
+                          }
+                        >
+                          Archive
+                        </button>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+
+          <section className="panel">
+            <div className="panel__header">
+              <h2>Archived</h2>
+            </div>
+            {archivedConfigurations.length === 0 ? (
+              <div className="panel__empty">Archived configurations will show up here.</div>
+            ) : (
+              <div className="archived-list">
+                {archivedConfigurations.map((configuration) => (
+                  <article className="archived-row" key={configuration.id}>
+                    <div>
+                      <h3>{configuration.name}</h3>
+                      <p>{configuration.targetPlaylistName}</p>
+                    </div>
+                    <button
+                      className="button button--secondary"
+                      onClick={() =>
+                        setSnapshot((currentSnapshot) =>
+                          setArchiveState(currentSnapshot, configuration.id, false)
+                        )
+                      }
+                    >
+                      Restore
+                    </button>
+                  </article>
+                ))}
+              </div>
+            )}
+          </section>
+        </main>
+      )}
+
+      {showsAccountPanel && session ? (
+        <div className="modal-backdrop" onClick={() => setShowsAccountPanel(false)}>
+          <section className="modal" onClick={(event) => event.stopPropagation()}>
+            <div className="panel__header">
+              <h2>Spotify account</h2>
+              <button className="button button--ghost" onClick={() => setShowsAccountPanel(false)}>
+                Close
+              </button>
+            </div>
+            <dl className="account-grid">
+              <div>
+                <dt>Connected</dt>
+                <dd>Yes</dd>
+              </div>
+              <div>
+                <dt>Expires</dt>
+                <dd>{formatDateTime(session.expiryDate)}</dd>
+              </div>
+              <div>
+                <dt>Scopes</dt>
+                <dd>{session.scopeString || "playlist-read/private + modify"}</dd>
+              </div>
+            </dl>
+            <div className="card-actions">
+              <button className="button button--secondary" onClick={() => void handleConnectSpotify()}>
+                Reconnect Spotify
+              </button>
+              <button className="button button--ghost" onClick={handleSignOut}>
+                Sign out
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
+
+      {editorState ? (
+        <div className="modal-backdrop" onClick={() => setEditorState(null)}>
+          <section className="modal modal--large" onClick={(event) => event.stopPropagation()}>
+            <div className="panel__header">
+              <h2>{snapshot.configurations.some((configuration) => configuration.id === editorState.draft.id) ? "Edit configuration" : "New configuration"}</h2>
+              <button className="button button--ghost" onClick={() => setEditorState(null)}>
+                Close
+              </button>
+            </div>
+            <div className="editor-grid">
+              <div className="field">
+                <label>Configuration name</label>
+                <input
+                  value={editorState.draft.name}
+                  onChange={(event) => updateDraft((draft) => ({ ...draft, name: event.target.value }))}
+                />
+              </div>
+              <div className="field">
+                <label>Selection mode</label>
+                <select
+                  value={editorState.draft.selectionMode}
+                  onChange={(event) =>
+                    updateDraft((draft) => ({
+                      ...draft,
+                      selectionMode: event.target.value as PlaylistConfigurationDraft["selectionMode"],
+                      sourcePlaylists:
+                        event.target.value === "percent"
+                          ? draft.sourcePlaylists.map((sourcePlaylist) => ({
+                              ...sourcePlaylist,
+                              percentage: sourcePlaylist.percentage ?? 0
+                            }))
+                          : draft.sourcePlaylists
+                    }))
+                  }
+                >
+                  <option value="random">Random</option>
+                  <option value="percent">Percent</option>
+                </select>
+              </div>
+              <div className="field">
+                <label>Target track count</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={500}
+                  value={editorState.draft.targetTrackCount}
+                  onChange={(event) =>
+                    updateDraft((draft) => ({
+                      ...draft,
+                      targetTrackCount: clamp(Number(event.target.value) || 1, 1, 500)
+                    }))
+                  }
+                />
+              </div>
+              <label className="checkbox">
+                <input
+                  type="checkbox"
+                  checked={editorState.draft.isArchived}
+                  onChange={(event) =>
+                    updateDraft((draft) => ({
+                      ...draft,
+                      isArchived: event.target.checked
+                    }))
+                  }
+                />
+                Archive configuration
+              </label>
+            </div>
+
+            <section className="subpanel">
+              <div className="panel__header">
+                <h3>Target playlist</h3>
+              </div>
+              <div className="editor-grid">
+                <div className="field field--full">
+                  <label>Target playlist name</label>
+                  <input
+                    value={editorState.draft.targetPlaylistName}
+                    onChange={(event) =>
+                      updateDraft((draft) => ({
+                        ...draft,
+                        targetPlaylistName: event.target.value
+                      }))
+                    }
+                  />
+                </div>
+                <div className="card-actions">
+                  <button className="button button--secondary" onClick={() => void openPicker("target")}>
+                    Browse Spotify playlists
+                  </button>
+                  <button
+                    className="button button--ghost"
+                    onClick={() => void handleCreateTargetPlaylist()}
+                    disabled={editorState.isCreatingTargetPlaylist || editorState.draft.targetPlaylistName.trim() === ""}
+                  >
+                    {editorState.isCreatingTargetPlaylist ? "Creating…" : "Create target playlist in Spotify"}
+                  </button>
+                </div>
+              </div>
+              {editorState.draft.targetPlaylistID ? (
+                <p className="inline-note">Selected target: {editorState.draft.targetPlaylistName}</p>
+              ) : (
+                <p className="inline-note">Pick an existing Spotify playlist or create a new private one.</p>
+              )}
+            </section>
+
+            <section className="subpanel">
+              <div className="panel__header">
+                <h3>Source playlists</h3>
+                <button className="button button--secondary" onClick={() => void openPicker("sources")}>
+                  Add source playlist
+                </button>
+              </div>
+              {editorState.draft.sourcePlaylists.length === 0 ? (
+                <div className="panel__empty">No source playlists selected.</div>
+              ) : (
+                <div className="source-list">
+                  {editorState.draft.sourcePlaylists.map((sourcePlaylist) => (
+                    <div className="source-row" key={sourcePlaylist.id}>
+                      <div className="field field--grow">
+                        <label>Source playlist name</label>
+                        <input value={sourcePlaylist.playlistName} readOnly />
+                      </div>
+                      {editorState.draft.selectionMode === "percent" ? (
+                        <div className="field">
+                          <label>Contribution %</label>
+                          <input
+                            type="number"
+                            min={0}
+                            max={100}
+                            value={sourcePlaylist.percentage ?? 0}
+                            onChange={(event) =>
+                              updateDraft((draft) => ({
+                                ...draft,
+                                sourcePlaylists: draft.sourcePlaylists.map((item) =>
+                                  item.id === sourcePlaylist.id
+                                    ? {
+                                        ...item,
+                                        percentage: clamp(Number(event.target.value) || 0, 0, 100)
+                                      }
+                                    : item
+                                )
+                              }))
+                            }
+                          />
+                        </div>
+                      ) : null}
+                      <button
+                        className="button button--ghost"
+                        onClick={() =>
+                          updateDraft((draft) => ({
+                            ...draft,
+                            sourcePlaylists: draft.sourcePlaylists.filter((item) => item.id !== sourcePlaylist.id)
+                          }))
+                        }
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+
+            {editorState.validationIssues.length > 0 ? (
+              <section className="notice notice--error">
+                <div>
+                  <strong>Fix before saving</strong>
+                  <ul className="issue-list">
+                    {editorState.validationIssues.map((issue) => (
+                      <li key={issue}>{issue}</li>
+                    ))}
+                  </ul>
+                </div>
+              </section>
+            ) : null}
+            {editorState.saveError ? <div className="notice notice--error">{editorState.saveError}</div> : null}
+
+            <div className="modal__footer">
+              <button className="button button--ghost" onClick={() => setEditorState(null)}>
+                Cancel
+              </button>
+              <button className="button button--primary" onClick={saveDraft}>
+                Save
+              </button>
+            </div>
+
+            {editorState.pickerMode ? (
+              <div className="picker">
+                <div className="panel__header">
+                  <h3>{editorState.pickerMode === "target" ? "Target playlist" : "Source playlists"}</h3>
+                  <button
+                    className="button button--ghost"
+                    onClick={() => setEditorState({ ...editorState, pickerMode: null })}
+                  >
+                    Done
+                  </button>
+                </div>
+                <div className="picker-list">
+                  {playlistCache.map((playlist) => {
+                    const targetDisabled =
+                      editorState.pickerMode === "target" &&
+                      editorState.draft.sourcePlaylists.some((sourcePlaylist) => sourcePlaylist.playlistID === playlist.id);
+                    const sourceDisabled =
+                      editorState.pickerMode === "sources" &&
+                      editorState.draft.targetPlaylistID === playlist.id;
+                    const isDisabled = targetDisabled || sourceDisabled;
+
+                    return (
+                      <button
+                        className="picker-row"
+                        key={playlist.id}
+                        disabled={isDisabled}
+                        onClick={() => {
+                          if (editorState.pickerMode === "target") {
+                            setEditorState({
+                              ...editorState,
+                              pickerMode: null,
+                              draft: {
+                                ...editorState.draft,
+                                targetPlaylistID: playlist.id,
+                                targetPlaylistName: playlist.name
+                              }
+                            });
+                            return;
+                          }
+
+                          if (
+                            editorState.draft.sourcePlaylists.some(
+                              (sourcePlaylist) => sourcePlaylist.playlistID === playlist.id
+                            )
+                          ) {
+                            return;
+                          }
+
+                          setEditorState({
+                            ...editorState,
+                            draft: {
+                              ...editorState.draft,
+                              sourcePlaylists: [
+                                ...editorState.draft.sourcePlaylists,
+                                {
+                                  id: playlist.id,
+                                  playlistID: playlist.id,
+                                  playlistName: playlist.name,
+                                  percentage: editorState.draft.selectionMode === "percent" ? 0 : undefined
+                                }
+                              ]
+                            }
+                          });
+                        }}
+                      >
+                        <span>{playlist.name}</span>
+                        <span className="picker-row__meta">
+                          {playlist.ownerDisplayName} • {playlist.trackCount} tracks
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : null}
+          </section>
+        </div>
+      ) : null}
+
+      {previewState ? (
+        <div className="modal-backdrop" onClick={() => !previewState.isApplying && setPreviewState(null)}>
+          <section className="modal" onClick={(event) => event.stopPropagation()}>
+            <div className="panel__header">
+              <h2>Rebuild preview</h2>
+              <button className="button button--ghost" onClick={() => setPreviewState(null)} disabled={previewState.isApplying}>
+                Close
+              </button>
+            </div>
+            <dl className="account-grid">
+              <div>
+                <dt>Target playlist</dt>
+                <dd>{previewState.preview.targetPlaylistName}</dd>
+              </div>
+              <div>
+                <dt>Tracks to write</dt>
+                <dd>{previewState.preview.selection.selectedTracks.length}</dd>
+              </div>
+              <div>
+                <dt>Duplicates skipped</dt>
+                <dd>{previewState.preview.selection.skippedDuplicateTrackCount}</dd>
+              </div>
+              <div>
+                <dt>Local-only skipped</dt>
+                <dd>{previewState.preview.selection.skippedLocalTrackCount}</dd>
+              </div>
+              <div>
+                <dt>Unavailable skipped</dt>
+                <dd>{previewState.preview.selection.skippedInvalidTrackCount}</dd>
+              </div>
+            </dl>
+            <div className="allocation-list">
+              {previewState.preview.sourceAllocations.map((allocation) => (
+                <article className="allocation-card" key={allocation.sourcePlaylistID}>
+                  <h3>{allocation.sourcePlaylistName}</h3>
+                  <p className={allocationWasRebalanced(allocation) ? "allocation-card__warn" : ""}>
+                    {allocation.requestedTrackCount === null
+                      ? `Selected ${allocation.selectedTrackCount}`
+                      : `Requested ${allocation.requestedTrackCount} • actual ${allocation.selectedTrackCount}`}
+                  </p>
+                </article>
+              ))}
+            </div>
+            <p className="inline-note">
+              Confirming will replace the current contents of {previewState.preview.targetPlaylistName}.
+            </p>
+            {previewState.isApplying ? <div className="notice">{previewState.progressMessage ?? "Updating target playlist…"}</div> : null}
+            <div className="modal__footer">
+              <button className="button button--ghost" onClick={() => setPreviewState(null)} disabled={previewState.isApplying}>
+                Cancel
+              </button>
+              <button className="button button--primary" onClick={() => void handleApplyPreview()} disabled={previewState.isApplying}>
+                {previewState.isApplying ? "Rebuilding…" : "Confirm rebuild"}
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
+
+      {historyConfigurationID ? (
+        <div className="modal-backdrop" onClick={() => setHistoryConfigurationID(null)}>
+          <section className="modal" onClick={(event) => event.stopPropagation()}>
+            <div className="panel__header">
+              <h2>Rebuild history</h2>
+              <button className="button button--ghost" onClick={() => setHistoryConfigurationID(null)}>
+                Close
+              </button>
+            </div>
+            {configurationHistory(historyConfigurationID).length === 0 ? (
+              <div className="panel__empty">Confirmed rebuilds for this configuration will appear here.</div>
+            ) : (
+              <div className="history-list">
+                {configurationHistory(historyConfigurationID).map((entry) => (
+                  <article className="history-card" key={entry.id}>
+                    <h3>{historySummary(entry)}</h3>
+                    <p>{formatDateTime(entry.finishedAt)}</p>
+                    {entry.sourceAllocations.map((allocation) => (
+                      <p className="history-card__detail" key={allocation.sourcePlaylistID}>
+                        {allocation.sourcePlaylistName}:{" "}
+                        {allocation.requestedTrackCount === null
+                          ? `${allocation.selectedTrackCount} selected`
+                          : `requested ${allocation.requestedTrackCount}, actual ${allocation.selectedTrackCount}`}
+                      </p>
+                    ))}
+                  </article>
+                ))}
+              </div>
+            )}
+          </section>
+        </div>
+      ) : null}
+    </div>
+  );
+}
