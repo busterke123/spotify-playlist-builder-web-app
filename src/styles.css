@@ -432,6 +432,10 @@ code {
   align-items: end;
 }
 
+.source-row .field--grow {
+  grid-column: auto;
+}
+
 .picker {
   margin-top: 22px;
   padding-top: 22px;
