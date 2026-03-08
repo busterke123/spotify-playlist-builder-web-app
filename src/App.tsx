@@ -400,11 +400,9 @@ export function App(): ReactElement {
     <div className="app-shell">
       <header className="hero">
         <div className="hero__copy">
-          <p className="eyebrow">GitHub Pages Edition</p>
-          <h1>Build reusable Spotify playlist recipes in the browser.</h1>
+          <h1>Spotify Playlist Builder</h1>
           <p className="hero__text">
-            Your configurations stay in this browser. Spotify auth uses PKCE, rebuilds show a preview
-            before writing, and the target playlist can be created directly from the app.
+            Your configurations stay in this browser.
           </p>
           <div className="hero__actions">
             {session ? (
@@ -421,20 +419,6 @@ export function App(): ReactElement {
                 Connect Spotify
               </button>
             )}
-          </div>
-        </div>
-        <div className="hero__card">
-          <div className="stat">
-            <span className="stat__label">Redirect URI</span>
-            <span className="stat__value">{getRedirectURI()}</span>
-          </div>
-          <div className="stat">
-            <span className="stat__label">Stored configurations</span>
-            <span className="stat__value">{snapshot.configurations.length}</span>
-          </div>
-          <div className="stat">
-            <span className="stat__label">Where they live</span>
-            <span className="stat__value">This browser only</span>
           </div>
         </div>
       </header>
