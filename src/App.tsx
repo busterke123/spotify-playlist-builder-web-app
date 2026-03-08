@@ -400,26 +400,31 @@ export function App(): ReactElement {
     <div className="app-shell">
       <header className="hero">
         <div className="hero__copy">
-          <h1>Spotify Playlist Builder</h1>
+          <div className="hero__title-row">
+            <h1>Spotify Playlist Builder</h1>
+            {session ? (
+              <button
+                className="button button--ghost hero__icon-button"
+                onClick={() => setShowsAccountPanel(true)}
+                aria-label="Open Spotify account"
+                title="Spotify account"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M19.14 12.94c.04-.31.06-.62.06-.94s-.02-.63-.06-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7.27 7.27 0 0 0-1.63-.94l-.36-2.54A.5.5 0 0 0 13.89 2h-3.78a.5.5 0 0 0-.49.42l-.36 2.54c-.58.23-1.13.54-1.63.94l-2.39-.96a.5.5 0 0 0-.6.22L2.72 8.48a.5.5 0 0 0 .12.64l2.03 1.58c-.04.31-.06.62-.06.94s.02.63.06.94l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32a.5.5 0 0 0 .6.22l2.39-.96c.5.4 1.05.71 1.63.94l.36 2.54a.5.5 0 0 0 .49.42h3.78a.5.5 0 0 0 .49-.42l.36-2.54c.58-.23 1.13-.54 1.63-.94l2.39.96a.5.5 0 0 0 .6-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.58ZM12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7Z" />
+                </svg>
+              </button>
+            ) : null}
+          </div>
           <p className="hero__text">
             Your configurations stay in this browser.
           </p>
-          <div className="hero__actions">
-            {session ? (
-              <>
-                <button className="button button--primary" onClick={() => setEditorState(initialEditorState())}>
-                  New configuration
-                </button>
-                <button className="button button--secondary" onClick={() => setShowsAccountPanel(true)}>
-                  Spotify account
-                </button>
-              </>
-            ) : (
+          {!session ? (
+            <div className="hero__actions">
               <button className="button button--primary" onClick={() => void handleConnectSpotify()} disabled={isWorking}>
                 Connect Spotify
               </button>
-            )}
-          </div>
+            </div>
+          ) : null}
         </div>
       </header>
 

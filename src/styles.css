@@ -67,12 +67,35 @@ code {
   border-radius: 24px;
 }
 
+.hero__title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
 .hero h1 {
   margin: 0;
   font-size: clamp(2.4rem, 5vw, 4.8rem);
   line-height: 0.95;
   max-width: none;
   white-space: nowrap;
+}
+
+.hero__icon-button {
+  flex: 0 0 auto;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+}
+
+.hero__icon-button svg {
+  width: 22px;
+  height: 22px;
+  fill: currentColor;
 }
 
 .hero__text {
