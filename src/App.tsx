@@ -475,9 +475,11 @@ export function App(): ReactElement {
                           <h3>{configuration.name}</h3>
                           <p>Target: {configuration.targetPlaylistName}</p>
                         </div>
-                        <span className="pill">{selectionModeLabels[configuration.selectionMode]}</span>
                       </div>
-                      <p className="configuration-summary">{configuration.targetTrackCount} tracks</p>
+                      <p className="configuration-summary">
+                        <span>{configuration.targetTrackCount} tracks</span>
+                        <span>{selectionModeLabels[configuration.selectionMode]}</span>
+                      </p>
                       <ul className="configuration-source-list">
                         {configuration.sourcePlaylists.map((sourcePlaylist) => (
                           <li className="configuration-source-item" key={sourcePlaylist.id}>
@@ -495,7 +497,7 @@ export function App(): ReactElement {
                           onClick={() => void handlePreparePreview(configuration)}
                           disabled={activeConfigurationID !== null && activeConfigurationID !== configuration.id}
                         >
-                          Preview rebuild
+                          Rebuild
                         </button>
                         <button
                           className="button button--secondary"
