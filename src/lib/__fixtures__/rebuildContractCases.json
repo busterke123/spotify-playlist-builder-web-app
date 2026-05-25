@@ -1,0 +1,86 @@
+{
+  "cases": [
+    {
+      "name": "percent_rebalances_when_first_source_runs_out",
+      "selectionMode": "percent",
+      "targetTrackCount": 4,
+      "sourcePlaylists": [
+        { "playlistID": "a", "percentage": 50 },
+        { "playlistID": "b", "percentage": 50 }
+      ],
+      "tracksByPlaylistID": {
+        "a": [
+          { "trackID": "a1", "uri": "spotify:track:a1" }
+        ],
+        "b": [
+          { "trackID": "b1", "uri": "spotify:track:b1" },
+          { "trackID": "b2", "uri": "spotify:track:b2" },
+          { "trackID": "b3", "uri": "spotify:track:b3" }
+        ]
+      },
+      "expectedSelectedCount": 4,
+      "expectedSourcePrefixCounts": { "a": 1, "b": 3 }
+    },
+    {
+      "name": "percent_deduplicates_tracks_across_sources",
+      "selectionMode": "percent",
+      "targetTrackCount": 3,
+      "sourcePlaylists": [
+        { "playlistID": "a", "percentage": 50 },
+        { "playlistID": "b", "percentage": 50 }
+      ],
+      "tracksByPlaylistID": {
+        "a": [
+          { "trackID": "shared", "uri": "spotify:track:shared" },
+          { "trackID": "a1", "uri": "spotify:track:a1" }
+        ],
+        "b": [
+          { "trackID": "shared", "uri": "spotify:track:shared" },
+          { "trackID": "b1", "uri": "spotify:track:b1" },
+          { "trackID": "b2", "uri": "spotify:track:b2" }
+        ]
+      },
+      "expectedSelectedCount": 3,
+      "expectedUniqueURI": true
+    },
+    {
+      "name": "random_selects_requested_unique_tracks",
+      "selectionMode": "random",
+      "targetTrackCount": 2,
+      "sourcePlaylists": [
+        { "playlistID": "a", "percentage": 0 },
+        { "playlistID": "b", "percentage": 0 }
+      ],
+      "tracksByPlaylistID": {
+        "a": [
+          { "trackID": "a1", "uri": "spotify:track:a1" },
+          { "trackID": "a2", "uri": "spotify:track:a2" }
+        ],
+        "b": [
+          { "trackID": "b1", "uri": "spotify:track:b1" },
+          { "trackID": "a1", "uri": "spotify:track:a1" }
+        ]
+      },
+      "expectedSelectedCount": 2,
+      "expectedUniqueURI": true
+    },
+    {
+      "name": "fails_when_unique_tracks_are_insufficient",
+      "selectionMode": "percent",
+      "targetTrackCount": 5,
+      "sourcePlaylists": [
+        { "playlistID": "a", "percentage": 50 },
+        { "playlistID": "b", "percentage": 50 }
+      ],
+      "tracksByPlaylistID": {
+        "a": [
+          { "trackID": "a1", "uri": "spotify:track:a1" }
+        ],
+        "b": [
+          { "trackID": "b1", "uri": "spotify:track:b1" }
+        ]
+      },
+      "expectedErrorIncludes": "Not enough unique non-local tracks"
+    }
+  ]
+}

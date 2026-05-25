@@ -28,7 +28,7 @@ export class PlaylistRebuildEngineError extends Error {
 
   static insufficientUniqueTracks(requested: number, available: number): PlaylistRebuildEngineError {
     return new PlaylistRebuildEngineError(
-      `The saved configuration asked for ${requested} tracks, but only ${available} unique Spotify tracks were available after filtering duplicates and local-only tracks.`
+      `Not enough unique non-local tracks: requested ${requested}, available ${available}.`
     );
   }
 }
