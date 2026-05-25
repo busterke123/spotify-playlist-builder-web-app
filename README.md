@@ -1,6 +1,8 @@
 # Spotify Playlist Builder Web App
 
-Static browser app version of the mobile Spotify Playlist Builder. It is designed to be deployable on GitHub Pages, so it uses Spotify Authorization Code with PKCE and keeps saved configurations in browser storage.
+Static browser app version of Spotify Playlist Builder. It is designed to be deployable on GitHub Pages, so it uses Spotify Authorization Code with PKCE, calls Spotify APIs directly from the browser, and keeps saved configurations in browser storage.
+
+This app intentionally supports Spotify playlist configuration and rebuild workflows only. It does not import Rekordbox or Traktor DJ library files. Use the local Flask app when you need DJ library import or saved local library paths.
 
 ## Features
 
@@ -14,6 +16,13 @@ Static browser app version of the mobile Spotify Playlist Builder. It is designe
 - Global deduplication across source playlists
 - Skip local-only and unavailable Spotify tracks
 - Rebuild history per configuration
+
+## Non-goals
+
+- Importing DJ library playlists from Rekordbox or Traktor.
+- Reading saved local filesystem paths from the browser.
+- Running the Python DJ library parser stack.
+- Providing full feature parity with the local Flask app.
 
 ## Local persistence
 
@@ -35,6 +44,12 @@ Static browser app version of the mobile Spotify Playlist Builder. It is designe
 npm install
 npm run dev
 ```
+
+## Relationship To The Local App
+
+The local Flask app is the full desktop-local version. It keeps the DJ library import workflow because that workflow needs filesystem access and Python parser dependencies.
+
+This web app is the lightweight hosted version. Keep rebuild behavior aligned with the local app through contract tests, but keep the product promise narrower.
 
 ## Deployment
 
