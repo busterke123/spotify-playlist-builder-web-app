@@ -451,7 +451,8 @@ export function App(): ReactElement {
   return (
     <div className="app-shell">
       <header className="hero">
-        <div className="hero__copy">
+        <div className="hero-inner">
+          <div className="hero-kicker">Browser playlist console</div>
           <div className="hero__title-row">
             <h1>Spotify Playlist Builder</h1>
             {session ? (
@@ -467,17 +468,29 @@ export function App(): ReactElement {
               </button>
             ) : null}
           </div>
-          <p className="hero__text">
-            Your configurations stay in this browser.
-          </p>
-          {!session ? (
-            <div className="hero__actions">
-              <button className="button button--primary" onClick={() => void handleConnectSpotify()} disabled={isWorking}>
-                Connect Spotify
-              </button>
-            </div>
-          ) : null}
+          <p className="hero__text">Rebuild Spotify targets from saved browser configurations.</p>
         </div>
+        <div className="status-console" aria-label="Runtime status">
+          <div className="status-cell">
+            <span>Spotify</span>
+            <strong>{isResolvingSession ? "Checking" : session ? "Connected" : "Needs auth"}</strong>
+          </div>
+          <div className="status-cell">
+            <span>Configs</span>
+            <strong>{activeConfigurations.length} active</strong>
+          </div>
+          <div className="status-cell">
+            <span>Archive</span>
+            <strong>{archivedConfigurations.length} stored</strong>
+          </div>
+        </div>
+        {!session ? (
+          <div className="hero-auth">
+            <button className="button button--primary" onClick={() => void handleConnectSpotify()} disabled={isWorking}>
+              Connect Spotify
+            </button>
+          </div>
+        ) : null}
       </header>
 
       {errorMessage ? (
