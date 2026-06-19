@@ -70,6 +70,7 @@ http://localhost:5173/
 - Pending PKCE state is stored under `spotify-playlist-builder.auth-state` in `sessionStorage` while Spotify redirects back.
 - Browser-saved data persists across logins on the same browser, but does not sync across browsers or devices.
 - The Backup panel exports and imports a versioned JSON snapshot. Importing a backup replaces the current browser snapshot after confirmation.
+- If Spotify rejects a refresh token with `invalid_grant`, the app clears the stored Spotify session and requires a fresh login.
 
 ## Spotify Authorization
 

@@ -78,7 +78,7 @@ The UI creates private target playlists, edits configurations, archives/restores
 - **Interfaces:** `src/lib/spotifyAuth.ts`.
 - **Key data:** `VITE_SPOTIFY_CLIENT_ID`, dynamic redirect URI from `window.location`, `spotify-playlist-builder.auth-state`, and `spotify-playlist-builder.spotify-session`.
 
-The app stores the PKCE verifier in `sessionStorage` during redirect and stores the mapped Spotify session in `localStorage`. Refresh uses the browser-held refresh token and the public Spotify client ID.
+The app stores the PKCE verifier in `sessionStorage` during redirect and stores the mapped Spotify session in `localStorage`. Refresh uses the browser-held refresh token and the public Spotify client ID. If Spotify rejects refresh with `invalid_grant`, the app clears the stored session and requires a fresh PKCE login.
 
 ### Spotify API Client
 
@@ -152,7 +152,7 @@ The fixture content must match the local Flask app fixture at `../spotify-playli
 - **Persistence:** `localStorage` can be cleared by browser settings or privacy features. Snapshot backups are the only portable copy mechanism.
 - **Concurrency:** the UI allows one active rebuild/preview operation at a time through `activeConfigurationID` state.
 - **Performance:** source playlist reads are paged at Spotify limits. Target playlist writes are batched in groups of 100 URIs.
-- **Failure handling:** token refresh runs before Spotify API requests when a session is close to expiry. Spotify API errors surface response status and response text to the UI.
+- **Failure handling:** token refresh runs before Spotify API requests when a session is close to expiry. `invalid_grant` clears the stored Spotify session and forces a fresh login. Other Spotify API errors surface response status and response text to the UI.
 
 ## References
 

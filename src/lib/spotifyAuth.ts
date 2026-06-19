@@ -88,6 +88,10 @@ export function clearStoredSession(): void {
   window.localStorage.removeItem(sessionKey);
 }
 
+function isInvalidGrantError(error: Error): boolean {
+  return error.message.includes('"error":"invalid_grant"') || error.message.includes('"error": "invalid_grant"');
+}
+
 function sessionExpiryTime(session: SpotifySession): number {
   return new Date(session.expiryDate).getTime();
 }
@@ -207,11 +211,20 @@ export async function ensureValidSession(session: SpotifySession | null): Promis
     return session;
   }
 
-  const tokenResponse = await requestToken({
-    client_id: getSpotifyClientID(),
-    grant_type: "refresh_token",
-    refresh_token: session.refreshToken
-  });
+  let tokenResponse: TokenResponse;
+  try {
+    tokenResponse = await requestToken({
+      client_id: getSpotifyClientID(),
+      grant_type: "refresh_token",
+      refresh_token: session.refreshToken
+    });
+  } catch (error) {
+    if (error instanceof Error && isInvalidGrantError(error)) {
+      clearStoredSession();
+      throw new Error("Spotify session expired. Connect Spotify again.");
+    }
+    throw error;
+  }
   const refreshedSession = mapTokenResponse(tokenResponse, session);
   storeSession(refreshedSession);
   return refreshedSession;
