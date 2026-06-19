@@ -1,0 +1,24 @@
+# Tech Stack
+
+- TypeScript React app using Vite. `package.json` has `type: "module"`.
+- Runtime dependencies:
+  - `react ^19.0.0`
+  - `react-dom ^19.0.0`
+- Development/build/test dependencies:
+  - `typescript ^5.8.2`
+  - `vite ^6.2.0`
+  - `@vitejs/plugin-react ^5.0.0`
+  - `vitest ^3.0.8`
+  - `jsdom ^26.0.0`
+  - `@testing-library/react ^16.3.0`
+  - `@testing-library/user-event ^14.6.1`
+- Node.js 24 is the documented local/GitHub Pages workflow version.
+- Vite config:
+  - `base: "./"` for GitHub Pages project-path static hosting.
+  - Vitest environment is `jsdom`, globals enabled.
+- Runtime configuration comes from `VITE_SPOTIFY_CLIENT_ID` at dev/build time. `.env.local` is local state; `.env.example` is the safe template.
+- Browser storage keys:
+  - Snapshot: `spotify-playlist-builder.snapshot.v1` in `localStorage`.
+  - Spotify session: `spotify-playlist-builder.spotify-session` in `localStorage`.
+  - Pending PKCE auth state: `spotify-playlist-builder.auth-state` in `sessionStorage`.
+- Generated/no-touch files include `dist/`, `node_modules/`, coverage output, `*.tsbuildinfo`, local env files, and downloaded backup JSON exports.

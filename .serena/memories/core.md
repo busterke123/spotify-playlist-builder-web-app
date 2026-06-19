@@ -1,0 +1,29 @@
+# Core
+
+- Static React/Vite browser app for Spotify playlist configuration, previews, and rebuild writes. Deploys as static files, usually GitHub Pages.
+- Runtime boundary: browser-only. No backend service, server-side token store, database, queue, server user model, or Spotify client secret.
+- Main source map:
+  - `src/App.tsx`: single-page React UI, Spotify session orchestration, config editing, previews, rebuild writes, history, backup import/export.
+  - `src/main.tsx`: React entry point.
+  - `src/styles.css`: app styling.
+  - `src/lib/types.ts`: shared TypeScript domain types.
+  - `src/lib/configuration.ts`: configuration defaults and validation.
+  - `src/lib/storage.ts`: browser snapshot persistence, archive/restore, backup export/import parsing.
+  - `src/lib/spotifyAuth.ts`: Spotify Authorization Code with PKCE, token storage, refresh, redirect handling.
+  - `src/lib/spotifyApi.ts`: browser Spotify Web API calls for account playlists, target creation, source reads, target writes.
+  - `src/lib/rebuildEngine.ts`: random/percent selection, dedupe, local/unavailable skips, allocation counts, preview shaping.
+  - `src/lib/rebuildService.ts`: source loading, preview preparation, target replacement coordination.
+  - `src/lib/history.ts`: rebuild history entries and summaries.
+  - `src/lib/__fixtures__/rebuildContractCases.json`: mirrored rebuild contract fixture shared with local Flask app.
+- Product invariants:
+  - Keep Spotify OAuth as Authorization Code with PKCE in the browser; never add client secret.
+  - Keep Spotify auth/token refresh in `src/lib/spotifyAuth.ts`.
+  - Keep Spotify Web API calls in `src/lib/spotifyApi.ts`.
+  - Keep shared rebuild selection behavior in `src/lib/rebuildEngine.ts` and aligned with local Flask contract.
+  - Keep browser snapshot parsing/persistence/backup import/export in `src/lib/storage.ts`.
+  - Do not add DJ library import without explicit product decision. Rekordbox/Traktor parsing belongs to `../spotify-playlist-builder`.
+- Shared rebuild behavior must stay aligned through `src/lib/__fixtures__/rebuildContractCases.json` and `../spotify-playlist-builder/tests/fixtures/rebuild_contract_cases.json`.
+- Read `mem:tech_stack` for dependencies, scripts, and runtime/build details.
+- Read `mem:suggested_commands` for setup, dev, test, and build commands.
+- Read `mem:conventions` for domain language, storage keys, and change ownership rules.
+- Read `mem:task_completion` for verification expectations before closing tasks.
