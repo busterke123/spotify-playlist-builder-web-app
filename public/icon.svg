@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180" role="img" aria-labelledby="title desc">
+  <title>Spotify Playlist Builder icon</title>
+  <desc>Rounded teal tile with playlist bars and a rebuild loop badge.</desc>
+  <defs>
+    <linearGradient id="tile" x1="24" y1="20" x2="156" y2="160" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#14B8A6" />
+      <stop offset="1" stop-color="#0F766E" />
+    </linearGradient>
+  </defs>
+  <rect x="10" y="10" width="160" height="160" rx="38" fill="url(#tile)" />
+  <g fill="#F3F4F0">
+    <rect x="38" y="48" width="88" height="16" rx="8" />
+    <rect x="38" y="80" width="88" height="16" rx="8" />
+    <rect x="38" y="112" width="72" height="16" rx="8" />
+  </g>
+  <circle cx="132" cy="128" r="28" fill="#F59E0B" />
+  <path
+    d="M144 120a18 18 0 1 0 2 16"
+    fill="none"
+    stroke="#134E4A"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    stroke-width="10"
+  />
+  <path
+    d="M139 113l14 1-7 12"
+    fill="none"
+    stroke="#134E4A"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    stroke-width="10"
+  />
+</svg>
