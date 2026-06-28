@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
-import { clearStoredSession, ensureValidSession, storeSession } from "./spotifyAuth";
+import { ensureValidSession, storeSession } from "./spotifyAuth";
 import type { SpotifySession } from "./types";
 
 function makeSession(): SpotifySession {
@@ -15,6 +15,8 @@ describe("spotifyAuth", () => {
   beforeEach(() => {
     window.localStorage.clear();
     vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+    vi.stubEnv("VITE_SPOTIFY_CLIENT_ID", "test-client-id");
   });
 
   test("clears the stored session when Spotify rejects refresh with invalid_grant", async () => {
