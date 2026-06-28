@@ -120,6 +120,9 @@ npm run preview
 
 The Vite build uses `base: "./"` so the static output works under a GitHub Pages project path.
 
+- Static icon assets live in `public/` and are linked from `index.html` plus `public/site.webmanifest`.
+- iPhone home screen icon changes can appear stale until the saved shortcut is removed and added again.
+
 Shared rebuild behavior is checked against the local Flask app through mirrored fixtures:
 
 - Local app fixture: `../spotify-playlist-builder/tests/fixtures/rebuild_contract_cases.json`

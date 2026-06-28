@@ -144,6 +144,7 @@ The fixture content must match the local Flask app fixture at `../spotify-playli
 - Development commands are documented in `README.md` and `AGENTS.md`.
 - Production deploy runs through GitHub Pages on pushes to `main`: `npm ci`, `npm test`, `npm run build`, upload `dist`, deploy Pages.
 - `vite.config.ts` sets `base: "./"` so static assets work from a GitHub Pages project path.
+- Static app metadata in `index.html` and `public/site.webmanifest` declares the favicon and iPhone home screen icon set.
 
 ## Operational Concerns
 

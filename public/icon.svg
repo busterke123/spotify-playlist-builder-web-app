@@ -13,14 +13,21 @@
     <rect x="38" y="80" width="88" height="16" rx="8" />
     <rect x="38" y="112" width="72" height="16" rx="8" />
   </g>
-  <circle cx="132" cy="128" r="28" fill="#F59E0B" />
+  <circle cx="136" cy="132" r="22" fill="#F59E0B" />
   <path
-    d="M144 120a18 18 0 1 0 2 16"
+    d="M145 126a14 14 0 1 0 1 12"
     fill="none"
     stroke="#134E4A"
     stroke-linecap="round"
     stroke-linejoin="round"
-    stroke-width="10"
+    stroke-width="8"
   />
-  <path d="M139 113l14 1-7 12" fill="none" stroke="#134E4A" stroke-linecap="round" stroke-linejoin="round" stroke-width="10" />
+  <path
+    d="M141 120l11 1-5 9"
+    fill="none"
+    stroke="#134E4A"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    stroke-width="8"
+  />
 </svg>
